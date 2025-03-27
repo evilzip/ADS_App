@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from IncomeDataProcessor import IncomeDataProcessor
+from utils import generate_missing_data
 import _plot_builder
 import _plot_builder
 
@@ -35,7 +36,7 @@ if uploaded_file is not None:
 
         income_configured_data_frame['Time'] = df[selected_time_column].values
         income_configured_data_frame['Raw_Data'] = df[selected_value_column].values
-        income_configured_data_frame['Raw_Data'] = income_configured_data_frame['Raw_Data'].astype('float')
+        # income_configured_data_frame['Raw_Data'] = income_configured_data_frame['Raw_Data'].astype('float')
         income_configured_data_frame['Time'] = pd.to_datetime(income_configured_data_frame['Time'])
         income_configured_data_frame = income_configured_data_frame.set_index('Time')
         column_submit = st.form_submit_button("Submit columns selection")
@@ -64,6 +65,7 @@ if uploaded_file is not None:
         # st.session_state - python dictionary
         # Add income_configured_data_frame as value with key 'df_for_import'
         # st.session_state = {'df_for_import' : income_configured_data_frame}
+        income_configured_data_frame = generate_missing_data(income_configured_data_frame)
         if 'df_for_import' not in st.session_state:
             st.session_state['df_for_import'] = income_configured_data_frame
         else:
@@ -71,7 +73,7 @@ if uploaded_file is not None:
         df_for_import = income_configured_data_frame
         income_configured_data_frame.to_csv('Data/configured_csv.csv')
         st.write("Configured dataframe has been sent for  analysis")
-        print("data frame for analisis", income_configured_data_frame)
-        print("INFO", type(income_configured_data_frame.index))
-        print("INFO", type(income_configured_data_frame.Raw_Data))
+        # print("data frame for analisis", income_configured_data_frame)
+        # print("INFO", type(income_configured_data_frame.index))
+        # print("INFO", type(income_configured_data_frame.Raw_Data))
 
