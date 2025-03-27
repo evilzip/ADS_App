@@ -10,7 +10,7 @@ info_page = st.Page(
 
 sandbox = st.Page(
     page="views/sandbox.py",
-    title="Sandbox"
+    title="Result here"
 )
 
 upload_page = st.Page(
@@ -20,7 +20,7 @@ upload_page = st.Page(
 
 # --- NAVIGATION SETUP ---
 
-pg = st.navigation(pages=[info_page, sandbox, upload_page])
+pg = st.navigation(pages=[info_page, upload_page, sandbox  ])
 
 # # --- RUN NAVIGATION ---
 pg.run()

@@ -16,8 +16,9 @@ class PlotBuilder:
     # Предполагается что после обработки на входе все методы построения графиков будут
     # рассчитывать на структуру данных датафрэйм со столбцами: ['time', 'value']
     # возможно появятся столбцы после работы моделей.
-    def __int__(self):
-        pass
+    def __init__(self):
+        self.TICKFONTSIZE = 16
+        self.AXISTITLEFONT = 18
 
     def _scatter_single(self, data: pd.DataFrame, column_name):
         name = data.columns.values[1]
@@ -36,19 +37,6 @@ class PlotBuilder:
     def _scatter_ci_list(self, data: pd.DataFrame):
         columns_list = ['Lower_CI', 'Upper_CI']
         result_list = []
-        # for curve in columns_list:
-        #     # curve = go.Scatter(x=data['Time'],
-        #     #                    y=data[curve],
-        #     #                    name=curve,
-        #     #                    mode='lines+markers',
-        #     #                    line=dict(color='green', dash='dash')
-        #     #                    )
-        #     curve = go.Scatter(x=data.index,
-        #                        y=data[curve],
-        #                        name=curve,
-        #                        mode='lines+markers',
-        #                        line=dict(color='green', dash='dash')
-        #                        )
         curve = go.Scatter(  # Confidence bounds
             x=np.concatenate((data.index, data.index[::-1]), axis=0),
             y=np.concatenate((data['Lower_CI'], data['Upper_CI'][::-1]), axis=0),
@@ -58,34 +46,18 @@ class PlotBuilder:
             hoverinfo='skip',
             name='95% Confidence interval',
         )
-        # curve_u = go.Scatter(x=data.index,
-        #                      y=data['Upper_CI'],
-        #                      fill='tozeroy',
-        #                      name='Upper_CI',
-        #                      mode='lines',
-        #                      line=dict(color='green')
-        #                      )
-        # curve_l = go.Scatter(x=data.index,
-        #                      y=data['Lower_CI'],
-        #                      fill='tozeroy',
-        #                      name='Lower_CI',
-        #                      mode='lines',
-        #                      line=dict(color='green')
-        #                      )
         result_list.append(curve)
         # result_list.append(curve_l)
         return result_list
 
     def _anomalies_scatter(self, data: pd.DataFrame):
         anomalies_df = data[data['Anomalies'] == True]
-        print('anomalies_df', anomalies_df)
         # curve = go.Scatter(x=anomalies_df['Time'], y=anomalies_df['Raw_Data'], name='Anomalies', mode='markers')
         curve = go.Scatter(x=anomalies_df.index.values, y=anomalies_df['Raw_Data'], name='Anomalies', mode='markers')
         return curve
 
     def _anomalies_v_lines(self, data: pd.DataFrame, fig):
         anomalies_df = data[data['Anomalies'] == True]
-        print('anomalies_df', anomalies_df)
         for index in anomalies_df.index:
             fig.add_vline(x=index, line_color="red", line_width=1)
 
@@ -103,6 +75,7 @@ class PlotBuilder:
         fig.update_xaxes(
             mirror=True,
             ticks='outside',
+            tickfont=dict(size=self.TICKFONTSIZE),
             showline=True,
             linecolor='black',
             gridcolor='lightgrey',
@@ -110,12 +83,13 @@ class PlotBuilder:
         fig.update_yaxes(
             mirror=True,
             ticks='outside',
+            tickfont=dict(size=self.TICKFONTSIZE),
             showline=True,
             linecolor='black',
             gridcolor='lightgrey'
         )
-        fig.update_yaxes(title_text=data.columns.values[0])
-        fig.update_xaxes(title_text='Time')
+        fig.update_yaxes(title_text=data.columns.values[0], title_font=dict(size=self.AXISTITLEFONT))
+        fig.update_xaxes(title_text='Time', title_font=dict(size=self.AXISTITLEFONT))
         return fig
 
     def plot_scatter(self, data: pd.DataFrame, columns_list: list):
@@ -131,6 +105,7 @@ class PlotBuilder:
         fig.update_xaxes(
             mirror=True,
             ticks='outside',
+            tickfont=dict(size=self.TICKFONTSIZE),
             showline=True,
             linecolor='black',
             gridcolor='lightgrey',
@@ -138,25 +113,72 @@ class PlotBuilder:
         fig.update_yaxes(
             mirror=True,
             ticks='outside',
+            tickfont=dict(size=self.TICKFONTSIZE),
             showline=True,
             linecolor='black',
             gridcolor='lightgrey'
         )
-        fig.update_yaxes(title_text=data.columns.values[0])
-        fig.update_xaxes(title_text='Time')
+        fig.update_yaxes(title_text=data.columns.values[0], title_font=dict(size=self.AXISTITLEFONT))
+        fig.update_xaxes(title_text='Time', title_font=dict(size=self.AXISTITLEFONT))
         return fig
 
     def anomalies_pie(self, data):
         labels = ['Anomalies', 'Data Points']
+        total_points_amount = data.shape[0]
         anomalies_amount = data['Anomalies'][data['Anomalies'] == True].count()
         points_amount = data.shape[0] - anomalies_amount
         values = [anomalies_amount, points_amount]
-        # print('values', values)
         # fig = go.Figure(data=[go.Pie(labels=labels, values=values)])
         # fig.update_traces(textinfo='label+value')
         fig = go.Figure()
-        fig = make_subplots(rows=1, cols=2, specs=[[{'type': 'pie'}, {'type': 'pie'}]])
-        fig.add_trace(go.Pie(labels=labels, values=values, textinfo='label+value'), 1, 1)
-        fig.add_trace(go.Pie(labels=labels, values=values, textinfo='label+percent'), 1, 2)
-        fig.update_layout(showlegend=False)
+        # fig = make_subplots(rows=1, cols=2, specs=[[{'type': 'pie'}, {'type': 'pie'}]])
+        fig.add_trace(go.Pie(labels=labels,
+                             values=values,
+                             textinfo='percent+value',
+                             hole=0.5,
+                             pull=[0, 0.1]))
+        # fig.add_trace(go.Pie(labels=labels, values=values, textinfo='label+percent'), 1, 2)
+        fig.update_layout(autosize=True),
+                          # width=500,
+                          # height=500)
+        fig.update_layout(showlegend=True)
+        fig.update_layout(annotations=[dict(text=f"Total: {total_points_amount}", x=0.5, y=0.5,
+                                            font_size=16, showarrow=False, xanchor="center")])
+        return fig
+
+    def plot_missing_data(self, data, fig):
+        missing_data_index = data[data['Raw_Data'].isnull()].index
+        for index in missing_data_index:
+            fig.add_vline(x=index, line_color='red', line_width=0.8)
+        return fig
+
+    def plot_imputed_data(self, data, fig):
+        imputed_data = data[data.notnull()]
+        curve = go.Scatter(x=imputed_data.index.values,
+                           y=imputed_data.values,
+                           mode='markers',
+                           marker=dict(color='red'),
+                           name='imputed data')
+        fig.add_trace(curve)
+        fig.update_layout(title='Raw_Data with Imputed data', title_x=0.5)
+        return fig
+
+    def missing_pie(self, data):
+        labels = ['Missing Data', 'Data Points']
+        total_points_amount = data.shape[0]
+        missing_amount = data['Missing'][data['Missing'] == True].count()
+        points_amount = data.shape[0] - missing_amount
+        values = [missing_amount, points_amount]
+        fig = go.Figure()
+        # fig = make_subplots(rows=1, cols=2, specs=[[{'type': 'pie'}, {'type': 'pie'}]])
+        fig.add_trace(go.Pie(labels=labels,
+                             values=values,
+                             textinfo='percent+value',
+                             hole=0.5,
+                             pull=[0, 0.1]))
+        # fig.add_trace(go.Pie(labels=labels, values=values, textinfo='label+percent'), 1, 2)
+        fig.update_layout(autosize=True)
+        fig.update_layout(showlegend=True)
+        fig.update_layout(annotations=[dict(text=f"Total: {total_points_amount}", x=0.5, y=0.5,
+                                            font_size=16, showarrow=False, xanchor="center")])
         return fig

@@ -1,11 +1,8 @@
-from math import sqrt
 import warnings
-import time
 from itertools import product
 from warnings import catch_warnings
 from warnings import filterwarnings
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-from sklearn.metrics import mean_squared_error
 import pandas as pd
 import numpy as np
 from tqdm.notebook import tqdm
@@ -21,6 +18,8 @@ class SARIMAX_GS_smart_index:
         # Time | Rw_Data | Y_Forecasted| Lower_CI | Upper_CI | Anomalies |
 
         self.model_quality_df = pd.DataFrame()
+        # mape| rmse | mse
+
         self.model_info = pd.DataFrame()
         self.model_df_least_MAPE = pd.DataFrame()
         self.model_df_least_MSE = pd.DataFrame()
@@ -42,6 +41,7 @@ class SARIMAX_GS_smart_index:
         for i in order:
             for j in seasonal_order:
                 try:
+                    print(f'Current fitting orders: {i}, seasonal_order: {j}')
                     model_fit = SARIMAX(endog=endog, order=i, seasonal_order=j).fit(disp=False)
                     predict = model_fit.predict()
 
@@ -59,12 +59,13 @@ class SARIMAX_GS_smart_index:
         # create a dataframe to store info of all models
         columns = ["order", "seasonal_order", "MAPE", "MSE", "AIC", "BIC"]
         model_info = pd.DataFrame(data=model_info, columns=columns)
-        print('model_info', model_info.head())
+        print('model_info' + '\n', model_info.head())
         L1 = model_info[model_info.MAPE == model_info.MAPE.min()]
         L2 = model_info[model_info.MSE == model_info.MSE.min()]
         L3 = model_info[model_info.AIC == model_info.AIC.min()]
         L4 = model_info[model_info.BIC == model_info.BIC.min()]
         self.best_models = pd.concat((L1, L2, L3, L4))
+        print('best_models' + '\n', self.best_models.head())
         self.model_info = model_info
 
     def pdq_PDQm_finder(self):
@@ -75,7 +76,7 @@ class SARIMAX_GS_smart_index:
         D = [0, 1, 2]
         Q = [0, 1]
         # dominant_period, _, _ = self.fft_analysis(self.model_df['Raw_Data'].values)
-        s = [24]
+        s = [7]
         pdq = list(product(p, d, q))
         PDQm = list(product(P, D, Q, s))
         return pdq, PDQm
@@ -115,26 +116,12 @@ class SARIMAX_GS_smart_index:
         # anomalies = anomalies[anomalies['Anomalies'] == True]
         return anomalies
 
-    def smart_fit(self, data):
+    def fit_predict(self, data):
         # 1. fill up model result dataframe
-        # data = data.set_index('Time')
-        # data.index = pd.to_datetime(data.index)
-        # print('income_data', data)
         self.model_df_least_MAPE = \
             self.model_df_least_MSE = \
             self.model_df_least_AIC = \
             self.model_df_least_BIC = data.copy()
-        # self.model_df_least_MAPE['Time'] = \
-        #     self.model_df_least_MSE['Time'] = \
-        #     self.model_df_least_AIC['Time'] = \
-        #     self.model_df_least_BIC['Time'] = data['Time']
-        # self.model_df_least_MAPE['Raw_Data'] = \
-        #     self.model_df_least_MSE['Raw_Data'] = \
-        #     self.model_df_least_AIC['Raw_Data'] = \
-        #     self.model_df_least_BIC['Raw_Data'] = data['Raw_Data']
-        # self.model_df['Time'] = data['Time']
-        # self.model_df['Raw_Data'] = data['Raw_Data']
-        # raw_data = data['Raw_Data'].values.tolist()  # ? ДЛя чего ?
 
         # 2. Train test split
         train, test = self.train_test_split(data, k=0.5)
@@ -144,6 +131,7 @@ class SARIMAX_GS_smart_index:
         # 3. Find dominant period = main season = m
         print("data['Raw_Data'].values", type(data['Raw_Data'].values[0]))
         dominant_period, _, _ = self.fft_analysis(signal=data['Raw_Data'].values)
+        print('dominant_period', dominant_period)
 
         # 4. Find pdq and PDQ
         pdq, PDQm = self.pdq_PDQm_finder()
@@ -166,8 +154,6 @@ class SARIMAX_GS_smart_index:
             # print('s_ord_list[i]', s_ord_list[i])
             model_fit = SARIMAX(endog=data['Raw_Data'], order=ord_list[i],
                                 seasonal_order=s_ord_list[i]).fit(disp=False)  # Fit the model
-            # pred_summary = model_fit.get_prediction(test.index[0],
-            #                                         test.index[-1]).summary_frame()
             # Compute preds
             # pred_summary = model_fit.get_prediction(test.index[0],
             #                                         test.index[-1]).summary_frame()
@@ -184,6 +170,7 @@ class SARIMAX_GS_smart_index:
 
         # Calculate Model quality
         self._model_quality()
+        self.model_df = self.model_df_least_MAPE.copy()
 
         # print(model_dfs[i])
         # Mark anomalies which is outside of CI
