@@ -110,6 +110,8 @@ class HoltWinters:
                                                                                  smoothing_slope=self.best_beta,
                                                                                  smoothing_seasonal=self.best_gamma)
         print('len(self.test)', len(self.test))
+
+        # 6. Prediction
         self.model_df['Y_Predicted'] = best_model.forecast(len(test))
 
         # Calculate Model quality
