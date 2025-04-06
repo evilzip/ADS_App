@@ -1,1 +1,1 @@
-from . import plot_builder
+from . import PlotBuilder

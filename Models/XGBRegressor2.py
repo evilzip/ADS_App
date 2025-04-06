@@ -7,9 +7,10 @@ from xgboost import plot_importance, plot_tree
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from confident_intervals.ConfidentIntervals import ConfidentIntervals
 from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, root_mean_squared_error, r2_score
+from sklearn.preprocessing import StandardScaler
 
 
-class XGBoostRegressor:
+class XGBoostRegressor2:
     def __init__(self):
         self.y_test = None
         self.x_train = None
@@ -21,10 +22,16 @@ class XGBoostRegressor:
         self.model_quality_df = pd.DataFrame()
         # mape| rmse | mse
 
-    def _create_features(self, data):
+    def _create_features(self, data, lag_start=6, lag_end=25):
         """
         Creates time series features from datetime index
         """
+        # Create lag features
+        lag_columns = []
+        for i in range(lag_start, lag_end):
+            lag_columns.append(f'lag_{i}')
+            data[f'lag_{i}'] = data['Raw_Data'].shift(i)
+
         data['date'] = data.index
         print("data.index", data.index)
         data['hour'] = data['date'].dt.hour
@@ -35,36 +42,66 @@ class XGBoostRegressor:
         data['dayofyear'] = data['date'].dt.dayofyear
         data['dayofmonth'] = data['date'].dt.day
         data['weekofyear'] = data['date'].dt.isocalendar().week
-        x = data[['hour', 'dayofweek', 'quarter', 'month', 'year',
-                  'dayofyear', 'dayofmonth', 'weekofyear']]
-        y = data['Raw_Data']
+        calendar_columns = ['hour', 'dayofweek', 'quarter', 'month', 'year',
+                            'dayofyear', 'dayofmonth', 'weekofyear']
+        columns = lag_columns + calendar_columns
+        x = data[columns].dropna()
+        y = data['Raw_Data'].loc[x.index]
         return x, y
 
-    def _train_test_split(self, data, k=0.9):
-        train = data.iloc[:int(len(data) * k)]
-        test = data.iloc[int(len(data) * k):]
-        x_train, y_train = self._create_features(train)
-        x_test, y_test = self._create_features(test)
+    def _create_lags(self, data):
+        for i in range(6, 25):
+            data["lag_{}".format(i)] = data['Raw_Data'].shift(i)
+
+    def _train_test_split(self, x, y, k=0.9):
+        print('x', x.shape)
+        print('y', y.shape)
+        x_train = x.iloc[:int(len(x) * k)]
+        x_test = x.iloc[int(len(x) * k):]
+        y_train = y.iloc[:int(len(x) * k)]
+        y_test = y.iloc[int(len(x) * k):]
+        print('x_train', x_train.shape)
+        print('x_test', x_test.shape)
+        print('y_train', y_train.shape)
+        print('y_test', y_test.shape)
         return x_train, y_train, x_test, y_test
 
     def _tes_optimizer(self, train, test, seasonal_periods=12):
         pass
+
+    def _prepare_data(self, data, lag_start, lag_end, k=0.7):
+        x, y = self._create_features(data=data, lag_start=lag_start, lag_end=lag_end)
+        x_train, y_train, x_test, y_test = self._train_test_split(x, y, k=k)
+
+        return x_train, y_train, x_test, y_test
 
     def fit_predict(self, data):
         # 1. fill up model result dataframe
         self.model_df = data.copy()
 
         # 2. Train test split
-        self.x_train, self.y_train, self.x_test, self.y_test = self._train_test_split(self.model_df, k=0.7)
+        self.x_train, self.y_train, self.x_test, self.y_test =\
+            self._prepare_data(self.model_df, lag_start=6, lag_end=25, k=0.7)
 
-        reg = xgb.XGBRegressor(n_estimators=1000, early_stopping_rounds=50, )
-        reg.fit(self.x_train, self.y_train,
-                eval_set=[(self.x_train, self.y_train), (self.x_test, self.y_test)],
+        # 3.
+        scaler = StandardScaler()
+        x_train_scaled = scaler.fit_transform(self.x_train)
+        x_test_scaled = scaler.transform(self.x_test)
+
+        print('x_train_scaled', x_train_scaled.shape)
+        print('self.y_train', self.y_train.shape)
+        print('x_test_scaled', x_test_scaled.shape)
+        print('self.y_test', self.y_test.shape)
+
+
+        reg = xgb.XGBRegressor(n_estimators=1000, early_stopping_rounds=50)
+        reg.fit(x_train_scaled, self.y_train,
+                eval_set=[(x_train_scaled, self.y_train), (x_test_scaled, self.y_test)],
                 verbose=False)  # Change verbose to True if you want to see it train
 
         # 6. Prediction
         self.model_df['Y_Predicted'] = np.nan
-        self.model_df['Y_Predicted'].loc[self.y_test.index] = reg.predict(self.x_test)
+        self.model_df['Y_Predicted'].loc[self.y_test.index] = reg.predict(x_test_scaled)
 
         # 7. Calculate Model quality
         self._model_quality()

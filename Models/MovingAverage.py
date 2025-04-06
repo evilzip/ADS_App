@@ -1,5 +1,5 @@
 import pandas as pd
-from confident_intervals.confident_interavls import ConfidentIntervals
+from confident_intervals.ConfidentIntervals import ConfidentIntervals
 
 
 class MovingAverage:

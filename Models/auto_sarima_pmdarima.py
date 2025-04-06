@@ -1,96 +1,143 @@
-import numpy as np
-import pandas as pd
-from sktime.utils.plotting import plot_series
-from sktime.forecasting.model_selection import temporal_train_test_split
-from sktime.forecasting.base import ForecastingHorizon
-from scipy import stats
-import statsmodels.api as sm
-
-import matplotlib.pyplot as plt
-
-
-import seaborn as sns
-
 import warnings
-warnings.filterwarnings('ignore')
-
-def mape(y_true, y_pred):
-    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
-
-ads = pd.read_csv('C:\DATA\ADS_App\Data\pdv_ads.csv', index_col=['Time'], parse_dates=['Time']).asfreq('H')
-print(ads.shape)
-# print(ads)
-# ads.head()
-#
-#
-#
-y = ads.Ads/10**3  # в тысячах :)
-
-plt.plot(ads.index, ads.Ads)
-plt.title('Просмотры рекламы (тыс. часов за час)', fontsize=20, color='black')
-plt.tick_params(axis = 'both', which = 'major', labelsize = 14)
-plt.show()
-
-
-
-y_train, y_test = temporal_train_test_split(y, test_size=48)
-fh = ForecastingHorizon(y_test.index, is_relative=False)
-
-plot_series(y_train, y_test, labels=["y_train", "y_test"])
-plt.show
-print(y_train.shape[0], y_test.shape[0])
-
+from itertools import product
+from warnings import catch_warnings
+from warnings import filterwarnings
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+import pandas as pd
+import numpy as np
+from tqdm.notebook import tqdm
+from scipy.fft import fft
+from statsmodels.tools.eval_measures import mse
 import pmdarima as pm
-from pmdarima import model_selection
+from confident_intervals.ConfidentIntervals import ConfidentIntervals
+from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, root_mean_squared_error, r2_score
 
-arima_model = pm.auto_arima(
 
-    y_train,
-    start_p=1, start_q=1,
-    max_p=5, max_q=5,
+class AutoArima:
+    def __init__(self):
+        self.stepwise_mode = None
+        self.model_df = pd.DataFrame()
+        # Time | Rw_Data | Y_Forecasted| Lower_CI | Upper_CI | Anomalies |
 
-    seasonal=True, m=24,
-    start_P=0, start_Q=0,
-    max_P=2, max_Q=2,
+        self.model_quality_df = pd.DataFrame()
+        # mape| rmse | mse
 
-    max_D=2, max_d=2,
-    alpha=0.05,
-    test='kpss',
-    seasonal_test='ocsb',
+        self.train = None
+        self.test = None
+        self.test_index = None
+        self.dominant_period = None
 
-    trace=True,
-    error_action='ignore',
-    suppress_warnings=True,
-    stepwise=False,
-    n_fits=100,
-    information_criterion='bic',
-    out_of_sample_size=7
+    def SARIMA_grid(self, endog, seasonal_order):
+        warnings.simplefilter("ignore")
 
-    # Можно делать перебор гипер-параметров
-    # на основе метрики на тестовой выборке
-    # scoring='mae',
-)
+        # create an empty list to store values
+        model_info = []
 
-y_pred, pred_ci = arima_model.predict(
-    n_periods=48,
-    return_conf_int=True,
-    alpha=0.05
-)
+        # fit the model
+        stepwise_model = pm.auto_arima(endog,
+                                       start_p=0, start_q=0,
+                                       start_P=0, start_Q=0,
+                                       max_p=3, max_q=3,
+                                       max_P=3, max_Q=3,
+                                       m=seasonal_order,
+                                       seasonal=True,
+                                       trace=True,
+                                       error_action='ignore',
+                                       suppress_warnings=True,
+                                       stepwise=True,
+                                       information_criterion='aic',
+                                       )
+        print(stepwise_model.aic())
+        self.stepwise_mode = stepwise_model
 
-mape(y_pred, y_test)
+    def fft_analysis(self, signal):
+        # Linear detrending
+        slope, intercept = np.polyfit(np.arange(len(signal)), signal, 1)
+        trend = np.arange(len(signal)) * slope + intercept
+        detrended = signal - trend
+        fft_values = fft(detrended)
+        frequencies = np.fft.fftfreq(len(fft_values))
+        # Remove negative frequencies and sort
+        positive_frequencies = frequencies[frequencies > 0]
+        magnitudes = np.abs(fft_values)[frequencies > 0]
+        # Identify dominant frequency
+        dominant_frequency = positive_frequencies[np.argmax(magnitudes)]
+        # Convert frequency to period (e.g., days, weeks, months, etc.)
+        dominant_period = round(1 / dominant_frequency)
+        return dominant_period, positive_frequencies, magnitudes
 
-df_forecast = pd.DataFrame({'y_pred': y_pred, 'ci_lower': pred_ci[:,0], 'ci_upper': pred_ci[:,1]})
-df_forecast.index = fh.to_absolute_index()
-df_forecast.head()
+    def train_test_split(self, data, k=0.9):
+        # train = data['Raw_Data'].iloc[:int(len(data) * k)]
+        # test = data['Raw_Data'].iloc[int(len(data) * k):]
+        train = data['Raw_Data'].iloc[:int(len(data) * k)]
+        test = data['Raw_Data'].iloc[int(len(data) * k):]
+        return train, test
 
-fig, ax = plot_series(y_train, y_test, df_forecast.y_pred, labels=["y_train", "y_test", "y_pred"]);
-ax.fill_between(
-    ax.get_lines()[-1].get_xdata(),
-    df_forecast["ci_lower"],
-    df_forecast["ci_upper"],
-    alpha=0.2,
-    color=ax.get_lines()[-1].get_c(),
-    label=f"95% prediction intervals",
-)
-ax.legend(loc='lower left')
-plt.show()
+    def anomalies(self):
+        self._conf_intervals()
+        anomalies = pd.DataFrame()
+        self.model_df['Anomalies'] = False
+
+        self.model_df['Anomalies'] = (self.model_df['Raw_Data'] < self.model_df['Lower_CI']) | (
+                self.model_df['Raw_Data'] > self.model_df['Upper_CI'])
+        # self.model_df['Anomalies'] = self.model_df['Raw_Data'] > self.model_df['Upper_CI']
+
+        anomalies = self.model_df['Anomalies'][self.model_df['Anomalies'] == True]
+        # anomalies = self.model_df_least_MAPE['Anomalies'][self.model_df_least_MAPE['Anomalies'] == True]
+        # anomalies = anomalies[anomalies['Anomalies'] == True]
+        return anomalies
+
+    def fit_predict(self, data):
+        # 1. fill up model result dataframe
+        self.model_df = data.copy()
+
+        # 2. Train test split
+        train, test = self.train_test_split(data, k=0.7)
+        print('train/test', train, test)
+        self.train, self.test = train, test
+
+        # 3. Find dominant period = main season = m
+
+        # 4. Find pdq and PDQ
+
+        self.dominant_period, _, _ = self.fft_analysis(self.model_df['Raw_Data'].values)
+
+        # 5. Execute Grid search
+        self.SARIMA_grid(endog=train, seasonal_order=self.dominant_period)
+
+        # Take the configurations of the best models (!!! AFTER GS execution !!!)
+
+        # Fit the models and compute the forecasts
+        preds, conf_int = self.stepwise_mode.predict(n_periods=test.shape[0], return_conf_int=True)
+        print('preds', preds)
+
+        self.model_df['Y_Predicted'] = preds
+    def _conf_intervals(self):
+        ci = ConfidentIntervals()
+        true_data = self.test
+        model_data = self.model_df['Y_Predicted'][self.test.index]
+        lower_bond, upper_bound = ci.stats_ci(true_data=true_data,
+                                              model_data=model_data)
+        self.model_df['Upper_CI'] = self.model_df['Y_Predicted'] + upper_bound
+        self.model_df['Lower_CI'] = self.model_df['Y_Predicted'] - lower_bond
+
+    def _model_quality(self):
+        # self.model_df = self.model_df_least_MAPE.copy()
+        r2 = r2_score(self.test,
+                      self.model_df['Y_Predicted'][self.test.index])
+        mape = mean_absolute_percentage_error(self.test,
+                                              self.model_df['Y_Predicted'][self.test.index])
+        print('mape data', self.test, self.model_df['Y_Predicted'][self.test.index])
+        rmse = root_mean_squared_error(self.test,
+                                       self.model_df['Y_Predicted'][self.test.index])
+        mse = mean_squared_error(self.test,
+                                 self.model_df['Y_Predicted'][self.test.index])
+        print('mape', mape)
+        dict_data = {
+            'MAPE': mape,
+            'RMSE': rmse,
+            'MSE': mse,
+            'R2': r2
+        }
+        # self.model_quality_df = pd.DataFrame(list(dict_data.items()), columns=['METRIC', 'Value'])
+        self.model_quality_df = pd.DataFrame([[mape, rmse, mse, r2]], columns=['MAPE', 'RMSE', 'MSE', 'R2'])

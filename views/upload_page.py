@@ -1,14 +1,13 @@
 import streamlit as st
 import pandas as pd
-from IncomeDataProcessor import IncomeDataProcessor
+
 from utils import generate_missing_data
-import _plot_builder
-import _plot_builder
+
 
 df_for_import = pd.DataFrame()
 
-st.title("Upload dataset here - Only '*.cvs' File (temporarily)")
-idp = IncomeDataProcessor()
+st.title("Upload dataset here - Only '*.csv' File (temporarily)")
+
 #
 uploaded_file = st.file_uploader("Choose your dataset (csv file only)", key="upload_1")
 if uploaded_file is not None:

@@ -5,13 +5,13 @@ from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error, mean_absolute_percentage_error, \
     mean_squared_log_error
-from confident_intervals.confident_interavls import ConfidentIntervals
+from confident_intervals.ConfidentIntervals import ConfidentIntervals
 import warnings
 from warnings import catch_warnings
 from warnings import filterwarnings
 from tqdm.notebook import tqdm
 from scipy.fft import fft
-from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, root_mean_squared_error
+from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, root_mean_squared_error, r2_score
 
 
 class HoltWinters:
@@ -96,7 +96,7 @@ class HoltWinters:
         # 3. Seasonal period
         self.dominant_period, _, _ = self.fft_analysis(signal=data['Raw_Data'].values)
         print('dominant_period', self.dominant_period)
-        seasonal_periods = 7
+        seasonal_periods = self.dominant_period
 
         # 5. Optimization
         self.best_alpha, self.best_beta, self.best_gamma, best_mae = self._tes_optimizer(train,
@@ -135,12 +135,14 @@ class HoltWinters:
         ci = ConfidentIntervals()
         true_data = self.test
         model_data = self.model_df['Y_Predicted'][self.test.index]
-        bound = ci.confidence_intervals_v1_1(true_data=true_data,
-                                             model_data=model_data)
-        self.model_df['Upper_CI'] = self.model_df['Y_Predicted'] + bound
-        self.model_df['Lower_CI'] = self.model_df['Y_Predicted'] - bound
+        lower_bond, upper_bound = ci.stats_ci(true_data=true_data,
+                                              model_data=model_data)
+        self.model_df['Upper_CI'] = self.model_df['Y_Predicted'] + upper_bound
+        self.model_df['Lower_CI'] = self.model_df['Y_Predicted'] - lower_bond
 
     def _model_quality(self):
+        r2 = r2_score(self.test,
+                      self.model_df['Y_Predicted'][self.test.index])
         mape = mean_absolute_percentage_error(self.test,
                                               self.model_df['Y_Predicted'][self.test.index])
         rmse = root_mean_squared_error(self.test,
@@ -150,6 +152,8 @@ class HoltWinters:
         dict_data = {
             'MAPE': mape,
             'RMSE': rmse,
-            'MSE': mse
+            'MSE': mse,
+            'R2': r2
         }
-        self.model_quality_df = pd.DataFrame(list(dict_data.items()), columns=['METRIC', 'Value'])
+        # self.model_quality_df = pd.DataFrame(list(dict_data.items()), columns=['METRIC', 'Value'])
+        self.model_quality_df = pd.DataFrame([[mape, rmse, mse, r2]], columns=['MAPE', 'RMSE', 'MSE', 'R2'])

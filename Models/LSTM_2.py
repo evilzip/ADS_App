@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from keras.src.callbacks import ReduceLROnPlateau
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, root_mean_squared_error, r2_score
 
@@ -7,12 +8,12 @@ from confident_intervals.ConfidentIntervals import ConfidentIntervals
 
 # LSTM
 import tensorflow as tf
-from keras.layers import Input, Dense, LSTM, Dropout
+from keras.layers import Input, Dense, LSTM, Dropout, BatchNormalization
 from keras.models import Sequential, Model
 from keras.callbacks import EarlyStopping
 
 
-class LSTM_1:
+class LSTM_2:
     def __init__(self):
         self.test = None
         self.train = None
@@ -20,7 +21,7 @@ class LSTM_1:
         self.x_train = None
         self.y_train = None
         self.x_test = None
-        self.window_size = 60
+        self.window_size = 30
         self.model_df = pd.DataFrame()
         # Time | Rw_Data | Y_Forecasted| Lower_CI | Upper_CI | Anomalies |
 
@@ -28,28 +29,37 @@ class LSTM_1:
         # mape| rmse | mse
 
     def _train_test_split(self, data, k=0.9):
-        train = data['Raw_Data'].iloc[:int(len(data) * k)]
-        test = data['Raw_Data'].iloc[int(len(data) * k):]
+        test_index = int(len(data) * (1 - k))
+        train = data['Raw_Data'].iloc[:test_index]
+        test = data['Raw_Data'].iloc[test_index:]
         return train, test
 
     def _tes_optimizer(self, train, test, seasonal_periods=12):
         pass
 
     def define_model(self, x_train):
-        input1 = Input(shape=(self.window_size, 1))
-        x = LSTM(units=64, return_sequences=True)(input1)
-        x = Dropout(0.2)(x)
-        x = LSTM(units=64, return_sequences=True)(x)
-        x = Dropout(0.2)(x)
-        x = LSTM(units=64)(x)
-        x = Dropout(0.2)(x)
-        x = Dense(32, activation='softmax')(x)
-        dnn_output = Dense(1)(x)
-
-        model = Model(inputs=input1, outputs=[dnn_output])
-        model.compile(loss='mean_squared_error', optimizer='Nadam')
-        model.summary()
-
+        # 50, 64, 32, 16, 1
+        model = Sequential([
+            LSTM(64, return_sequences=True, input_shape=(x_train.shape[1], 1)),
+            LSTM(64, return_sequences=False),
+            Dense(32),
+            Dense(16),
+            Dense(1)
+            # LSTM(units=50, return_sequences=True, input_shape=(x_train.shape[1], 1)),
+            # Dropout(0.2),
+            #
+            # LSTM(units=50, return_sequences=True),
+            # Dropout(0.2),
+            #
+            # LSTM(units=50, return_sequences=True),
+            # Dropout(0.2),
+            #
+            # LSTM(units=50),
+            # Dropout(0.2),
+            #
+            # Dense(units=1),
+        ])
+        model.compile(optimizer='Nadam', loss='mse', metrics=['mse', 'mae', 'mape'])
         return model
 
     def fit_predict(self, data):
@@ -61,7 +71,7 @@ class LSTM_1:
         scaler.fit(self.model_df['Raw_Data'].values.reshape(-1, 1))
 
         # 3. Train test split
-        self.train, self.test = self._train_test_split(self.model_df, k=0.7)
+        self.train, self.test = self._train_test_split(self.model_df, k=0.35)
         test_size = len(self.test)
 
         train_data = self.model_df['Raw_Data'][:-test_size]
@@ -102,7 +112,23 @@ class LSTM_1:
         model = self.define_model(x_train=x_train)
         # history = model.fit(x_train, y_train, epochs=150, batch_size=32, validation_split=0.1, verbose=1)
         # Fitting the LSTM to the Training set
-        callbacks = [EarlyStopping(monitor='loss', patience=10, restore_best_weights=True)]
+        # Инициализация модели
+
+        # Сохраним лучшие веса модели
+
+        # Уменьшение шага обучения когда показатели точности застопорились
+        lr_reduction = ReduceLROnPlateau(monitor='loss',
+                                         patience=10,
+                                         verbose=2,
+                                         factor=.75)
+
+        # Если показатели точности не улучшаются за 20 эпох - останавливаем обучение
+        estopping = EarlyStopping(monitor='loss',
+                                  patience=20,
+                                  verbose=2)
+
+        # callbacks = [EarlyStopping(monitor='loss', patience=10, restore_best_weights=True)]
+        callbacks = [lr_reduction, estopping]
         history = model.fit(x_train, y_train, epochs=100, batch_size=32, callbacks=callbacks)
 
         result = model.evaluate(x_test, y_test)
@@ -136,7 +162,7 @@ class LSTM_1:
         ci = ConfidentIntervals()
         true_data = self.test
         model_data = self.model_df['Y_Predicted'][self.test.index]
-        lower_bond, upper_bound = ci.bootstrap_ci_2(true_data=true_data,
+        lower_bond, upper_bound = ci.stats_ci(true_data=true_data,
                                                     model_data=model_data)
         self.model_df['Upper_CI'] = self.model_df['Y_Predicted'] + upper_bound
         self.model_df['Lower_CI'] = self.model_df['Y_Predicted'] - lower_bond
@@ -156,4 +182,5 @@ class LSTM_1:
             'MSE': mse,
             'R2': r2
         }
-        self.model_quality_df = pd.DataFrame(list(dict_data.items()), columns=['METRIC', 'Value'])
+        # self.model_quality_df = pd.DataFrame(list(dict_data.items()), columns=['METRIC', 'Value'])
+        self.model_quality_df = pd.DataFrame([[mape, rmse, mse, r2]], columns=['MAPE', 'RMSE', 'MSE', 'R2'])
