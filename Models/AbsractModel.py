@@ -7,7 +7,7 @@ import datetime as dt
 import xgboost as xgb
 from xgboost import plot_importance, plot_tree
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from ConfidentIntervals import ConfidentIntervals
+from ConfidentIntervals.ConfidentIntervals import ConfidentIntervals
 from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, root_mean_squared_error, r2_score
 
 
