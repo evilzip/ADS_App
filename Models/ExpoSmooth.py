@@ -1,5 +1,5 @@
 import pandas as pd
-from confident_intervals.ConfidentIntervals import ConfidentIntervals
+from ConfidentIntervals.ConfidentIntervals import ConfidentIntervals
 
 
 class ExpoSmooth:

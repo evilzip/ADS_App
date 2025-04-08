@@ -2,14 +2,8 @@ import numpy as np
 import pandas as pd
 import itertools
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
-from statsmodels.tsa.exponential_smoothing.ets import ETSModel
-from sklearn.metrics import mean_absolute_error, root_mean_squared_error, mean_absolute_percentage_error, \
-    mean_squared_log_error
-from confident_intervals.ConfidentIntervals import ConfidentIntervals
+from ConfidentIntervals.ConfidentIntervals import ConfidentIntervals
 import warnings
-from warnings import catch_warnings
-from warnings import filterwarnings
-from tqdm.notebook import tqdm
 from scipy.fft import fft
 from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, root_mean_squared_error, r2_score
 
@@ -31,12 +25,10 @@ class HoltWinters:
         self.train = None
 
     def _train_test_split(self, data, k=0.9):
-        # train = data['Raw_Data'].iloc[:int(len(data) * k)]
-        # test = data['Raw_Data'].iloc[int(len(data) * k):]
+
         train = data['Raw_Data'].iloc[:int(len(data) * k)]
         test = data['Raw_Data'].iloc[int(len(data) * k):]
-        # train = data['Raw_Data'][:'1997-12-01']
-        # test = data['Raw_Data']['1998-01-01':]
+
         return train, test
 
     def fft_analysis(self, signal):
@@ -127,8 +119,6 @@ class HoltWinters:
         # self.model_df['Anomalies'] = self.model_df['Raw_Data'] > self.model_df['Upper_CI']
 
         anomalies = self.model_df['Anomalies'][self.model_df['Anomalies'] == True]
-        # anomalies = self.model_df_least_MAPE['Anomalies'][self.model_df_least_MAPE['Anomalies'] == True]
-        # anomalies = anomalies[anomalies['Anomalies'] == True]
         return anomalies
 
     def _conf_intervals(self):

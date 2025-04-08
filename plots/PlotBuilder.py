@@ -14,10 +14,10 @@ class PlotBuilder:
     # рассчитывать на структуру данных датафрэйм со столбцами: ['time', 'value']
     # возможно появятся столбцы после работы моделей.
     def __init__(self):
-        self.TICKFONTSIZE = 16 + 18
-        self.AXISTITLEFONT = 18 + 18
-        self.TITLEFONT = 20 + 18
-        self.LEGENDFONT = 12 + 18
+        self.TICKFONTSIZE = 16 + 10
+        self.AXISTITLEFONT = 18 + 10
+        self.TITLEFONT = 20 + 10
+        self.LEGENDFONT = 12 + 10
 
     def _scatter_single(self, data: pd.DataFrame, column_name):
         name = data.columns.values[1]

@@ -12,7 +12,7 @@
 #     mean_squared_error
 # from sklearn.model_selection import TimeSeriesSplit
 # from utils import timeseries_train_test_split
-# from confident_intervals.confident_interavls import ConfidentIntervals
+# from ConfidentIntervals.confident_interavls import ConfidentIntervals
 # from scipy.optimize import minimize
 #
 #

@@ -61,7 +61,7 @@ if data is not None:
     fig = pb.bar_missing(imputation.imputation_df)
     st.plotly_chart(fig, theme=None, use_container_width=True, key='missing_bar')
 
-    model = auto_Arima
+    model = xgb3
 
     # Main Calculation
     with st.spinner("Calculations in progress..."):

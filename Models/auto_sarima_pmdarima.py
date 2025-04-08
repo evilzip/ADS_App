@@ -9,7 +9,7 @@ from tqdm.notebook import tqdm
 from scipy.fft import fft
 from statsmodels.tools.eval_measures import mse
 import pmdarima as pm
-from confident_intervals.ConfidentIntervals import ConfidentIntervals
+from ConfidentIntervals.ConfidentIntervals import ConfidentIntervals
 from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, root_mean_squared_error, r2_score
 
 

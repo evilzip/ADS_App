@@ -7,7 +7,7 @@ import pandas as pd
 from itertools import product
 import numpy as np
 from utils import timeseries_train_test_split
-from confident_intervals.ConfidentIntervals import ConfidentIntervals
+from ConfidentIntervals.ConfidentIntervals import ConfidentIntervals
 
 
 class SARIMAX:

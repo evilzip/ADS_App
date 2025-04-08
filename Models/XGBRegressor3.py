@@ -1,3 +1,6 @@
+# **********************************************************************************************************************
+# *                                             Final Version of XGBoost                                               *
+# **********************************************************************************************************************
 import numpy as np
 import pandas as pd
 import datetime as dt
@@ -5,7 +8,7 @@ import optuna
 import xgboost as xgb
 from xgboost import plot_importance, plot_tree
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from confident_intervals.ConfidentIntervals import ConfidentIntervals
+from ConfidentIntervals.ConfidentIntervals import ConfidentIntervals
 from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, root_mean_squared_error, r2_score
 from sklearn.preprocessing import StandardScaler
 
@@ -18,9 +21,11 @@ class XGBoostRegressor3:
         self.x_test = None
         self.test_index = None
         self.model_df = pd.DataFrame()
+        # Model_df columns
         # Time | Rw_Data | Y_Forecasted| Lower_CI | Upper_CI | Anomalies |
 
         self.model_quality_df = pd.DataFrame()
+        # Model quality column
         # mape| rmse | mse
 
     def _create_features(self, data, lag_start=6, lag_end=25):
@@ -50,11 +55,14 @@ class XGBoostRegressor3:
         y = data['Raw_Data'].loc[x.index]
         return x, y
 
-    def _create_lags(self, data):
-        for i in range(6, 25):
-            data["lag_{}".format(i)] = data['Raw_Data'].shift(i)
-
     def _train_test_split(self, x, y, k=0.9):
+        """
+
+        :param x: train series
+        :param y: test series
+        :param k: proportion test/train
+        :return: x_train, y_train, x_test, y_test - timeseries
+        """
         test_index = int(len(x) * (1 - k))
         self.test_index = test_index
         print('x', x.shape)
@@ -70,6 +78,15 @@ class XGBoostRegressor3:
         return x_train, y_train, x_test, y_test
 
     def _optimizer(self, x_train, y_train, x_test, y_test):
+        """
+        Function to find the best XGBoost params with Optuna
+        :param x_train:
+        :param y_train:
+        :param x_test:
+        :param y_test:
+        :return: study.best_param
+        """
+
         def objective(trial):
             params = {
                 'objective': 'reg:squarederror',
@@ -130,7 +147,7 @@ class XGBoostRegressor3:
         reg = xgb.XGBRegressor(**best_param)
         reg.fit(x_train_scaled, self.y_train,
                 eval_set=[(x_train_scaled, self.y_train), (x_test_scaled, self.y_test)],
-                verbose=False)  # Change verbose to True if you want to see it train
+                verbose=False)
 
         # 6. Prediction
         self.model_df['Y_Predicted'] = np.nan
@@ -143,23 +160,17 @@ class XGBoostRegressor3:
         self._conf_intervals()
         anomalies = pd.DataFrame()
         self.model_df['Anomalies'] = False
-
         self.model_df['Anomalies'] = (self.model_df['Raw_Data'] < self.model_df['Lower_CI']) | (
                 self.model_df['Raw_Data'] > self.model_df['Upper_CI'])
-        # self.model_df['Anomalies'] = self.model_df['Raw_Data'] > self.model_df['Upper_CI']
-
         anomalies = self.model_df['Anomalies'][self.model_df['Anomalies'] == True]
-        # anomalies = self.model_df_least_MAPE['Anomalies'][self.model_df_least_MAPE['Anomalies'] == True]
-        # anomalies = anomalies[anomalies['Anomalies'] == True]
         return anomalies
 
     def _conf_intervals(self):
         ci = ConfidentIntervals()
-
         true_data = self.y_test
         model_data = self.model_df['Y_Predicted'][self.y_test.index]
         lower_bond, upper_bound = ci.stats_ci(true_data=true_data,
-                                                    model_data=model_data)
+                                              model_data=model_data)
         self.model_df['Upper_CI'] = self.model_df['Y_Predicted'] + upper_bound
         self.model_df['Lower_CI'] = self.model_df['Y_Predicted'] - lower_bond
         ci.print_all(true_data=true_data, model_data=model_data)

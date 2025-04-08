@@ -15,8 +15,8 @@ class ConfidentIntervals:
     def confidence_intervals_v1(self, true_data, model_data, scale=1.96):
         mae = mean_absolute_error(true_data, model_data)
         deviation = np.std(true_data - model_data)
-        lower_bond = model_data - (mae + scale * deviation)
-        upper_bond = model_data + (mae + scale * deviation)
+        lower_bond = (mae + scale * deviation)
+        upper_bond = (mae + scale * deviation)
         return lower_bond, upper_bond
 
     def confidence_intervals_v1_1(self, true_data, model_data, scale=1.96):
@@ -52,8 +52,8 @@ class ConfidentIntervals:
         for i in range(size):
             bs_list.append(np.mean(np.random.choice(abs_error, len(abs_error))))
         bs_list = bs_list - mae
-        left_quantile = (100 - interval) / 2
-        right_quantile = interval + (100 - interval) / 2
+        right_quantile = (100 - interval) / 2
+        left_quantile = interval + (100 - interval) / 2
         lower_bond = mae - np.percentile(bs_list, [left_quantile])
         upper_bound = mae - np.percentile(bs_list, [right_quantile])
         return lower_bond, upper_bound
@@ -77,6 +77,7 @@ class ConfidentIntervals:
         return lower_bond, upper_bound
 
     def print_all(self, true_data, model_data):
+        print(f"[confidence_intervals_v1] : {self.confidence_intervals_v1(true_data, model_data, scale=1.96)}")
         print(f"[Stats_CI] : {self.stats_ci(true_data, model_data)}")
         print(f"[BootStep_Hall] : {self.bootstrap_ci_hall(true_data, model_data, size=1000, interval=95)}")
         print(f"[bootstrap_ci_2] : {self.bootstrap_ci_2(true_data, model_data, size=10000, interval=95)}")
