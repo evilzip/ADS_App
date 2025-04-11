@@ -1,6 +1,9 @@
 # ADS_App
 Visual and Functional Prototype of "Anomaly Detection Software" project
 
+![image](https://github.com/user-attachments/assets/d25edc67-b696-4acc-8c0a-b177253dbb0a)
+
+
 # ИНФОРМАЦИЯ О БИЗНЕС-ПРОЕКТЕ
 
 ### Название стартапа: **Anomaly Detection Software**
