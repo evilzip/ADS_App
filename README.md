@@ -1,7 +1,7 @@
-## ADS_App
+# ADS_App
 Visual and Functional Prototype of "Anomaly Detection Software" project
 
-# ADS_MIPT. ИНФОРМАЦИЯ О БИЗНЕС-ПРОЕКТЕ
+# ИНФОРМАЦИЯ О БИЗНЕС-ПРОЕКТЕ
 
 ### Название стартапа: **Anomaly Detection Software**
 
